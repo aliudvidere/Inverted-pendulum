@@ -96,7 +96,27 @@ void Buzzer_setpoint_selection(void)
 	LL_mDelay(50);
 	LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_9);
 	LL_mDelay(500);
+}
 
+void end_sensor_signal(void)
+{
+	LL_GPIO_SetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
+	LL_mDelay(300);
+	LL_GPIO_ResetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
+	LL_mDelay(300);
+	LL_GPIO_SetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
+	LL_mDelay(300);
+	LL_GPIO_ResetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
+	LL_mDelay(300);
+	LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_9);
+	LL_mDelay(150);
+	LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_9);
+}
+void calibration(void)
+{
+	  LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_1); // Left moving
+	  LL_TIM_OC_SetCompareCH2(TIM2,0);            // Left moving
+	  LL_TIM_OC_SetCompareCH3(TIM2,40);           // Left moving
 }
 /* USER CODE END PFP */
 
@@ -115,8 +135,11 @@ int main(void)
 
 	int setpoint = 0;
 	int PID_p = 0;
-	long enc_pendulum = 6;
-	long enc_line = 6;
+	long enc_pendulum = 0;
+	long enc_carriage = 0;
+	long right_carriage_border = 0;
+	long left_carriage_border = 0;
+	long center_carriage_border = 0;
 
   /* USER CODE END 1 */
 
@@ -146,27 +169,37 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
-  TIM4->CR1 |= (1<<0); // Запускаем энкодер 4
-  TIM8->CR1 |= (1<<0); // Запускаем энкодер 8
-
-  LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
-  LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH3);
-  LL_TIM_EnableCounter(TIM2);
   Buzzer_Start();
+  TIM4->CR1 |= (1<<0); // Start timer 4 to read encoder
+  TIM8->CR1 |= (1<<0); // Start timer 8 to read encoder
 
+    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
+    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH3);
+    LL_TIM_EnableCounter(TIM2);
+  //LL_mDelay(1);
+ // LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);// Stop moving
+ // LL_mDelay(1);
+  //LL_TIM_OC_SetCompareCH2(TIM2,0);            // Stop
+  //LL_TIM_OC_SetCompareCH3(TIM2,0);           // Stop
+  //LL_mDelay(1);
+
+  // calibration();
+
+// Old code for Analog-to-Digital Converter. When we tried to use circular potentiometers instead of encoders =)
 //**************************************************************************************************************************************
   /*
-   LL_ADC_Enable(ADC1); // ВКЛЮЧАЕМ АЦП 1 (ADC1->CR2 |= (1«0);)
-   LL_ADC_REG_StartConversionSWStart(ADC1); // ДЕЛАЕМ ВЫБОРКУ С АЦП
-   while (LL_ADC_IsActiveFlag_EOCS(ADC1) != 1) {;} // ЖДЕМ ЕЁ ОКОНЧАН�?Я, КОГДА ПОДН�?МЕТЬСЯ ФЛАГ
-   LL_ADC_ClearFlag_EOCS(ADC1); // ОЧ�?ЩАЕМ ФЛАГ ЧТОБЫ СДЕЛАТЬ ЕЩЕ ОДНУ ВЫБОРКУ
-   setpoint = LL_ADC_REG_ReadConversionData12(ADC1); // ЗАБ�?РАЕМ ДАННЫЕ АЦП1 В setpoint вокруг этого будет фигачить пид
+   LL_ADC_Enable(ADC1); // Start of ADC 1 (ADC1->CR2 |= (1«0);)
+   LL_ADC_REG_StartConversionSWStart(ADC1); // Sample from ADC
+   while (LL_ADC_IsActiveFlag_EOCS(ADC1) != 1) {;} // Waiting for the end of the sample. When flag will be on
+   LL_ADC_ClearFlag_EOCS(ADC1); // Make flag off to allow to make another ample
+   setpoint = LL_ADC_REG_ReadConversionData12(ADC1); // Put data from ADC
    setpoint = setpoint/41;
-   Было в вайле:
-   LL_ADC_REG_StartConversionSWStart(ADC1); // ДЕЛАЕМ ВЫБОРКУ С АЦП
-   while (LL_ADC_IsActiveFlag_EOCS(ADC1) != 1) {;} // ЖДЕМ ЕЁ ОКОНЧАН�?Я, КОГДА ПОДН�?МЕТЬСЯ ФЛАГ
-   LL_ADC_ClearFlag_EOCS(ADC1); // ОЧ�?ЩАЕМ ФЛАГ ЧТОБЫ СДЕЛАТЬ ЕЩЕ ОДНУ ВЫБОРКУ
-   ADC_1_data = LL_ADC_REG_ReadConversionData12(ADC1); // ЗАБ�?РАЕМ ДАННЫЕ АЦП1 В ПЕРЕМЕННУЮ
+
+   It was in while section:
+   LL_ADC_REG_StartConversionSWStart(ADC1); // Sample from ADC
+   while (LL_ADC_IsActiveFlag_EOCS(ADC1) != 1) {;} // Waiting for the end of the sample. When flag will be on
+   LL_ADC_ClearFlag_EOCS(ADC1); // Make flag off to allow to make another ample
+   ADC_1_data = LL_ADC_REG_ReadConversionData12(ADC1); // Put data from ADC
    ADC_1_data = ADC_1_data / 41;
   */
 //**************************************************************************************************************************************
@@ -176,15 +209,22 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
   while (1)
   {
+// Encoders information:
+// enc_carriage from edge to edge have 1365 ticks
+// enc_pendulum have 1000 ticks for 1 full circle rotation
+
+
 
 //if (flag_from_interapt == 0)
 //{
-	enc_pendulum = LL_TIM_GetCounter(TIM4);
-	enc_line = LL_TIM_GetCounter(TIM8);
-	int x = 0;
+//	enc_pendulum = LL_TIM_GetCounter(TIM4); // Information about position of pendulum
+	//enc_carriage = LL_TIM_GetCounter(TIM8); // Information about position of carriage
+	//int x = 0;
+
+
+
 
 /*
 	PID_p = abs(((0.05 * (setpoint - ADC_1_data))));
@@ -211,20 +251,25 @@ int main(void)
 	}
 	*/
 
-	/*
-	LL_mDelay(2000);
-	LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_1);
-	LL_TIM_OC_SetCompareCH3(TIM2,60);
-	LL_mDelay(1500);
-	LL_TIM_OC_SetCompareCH3(TIM2,0);
-	LL_TIM_OC_SetCompareCH2(TIM2,60);
-	LL_mDelay(1500);
-	LL_TIM_OC_SetCompareCH2(TIM2,0);
-	LL_mDelay(1500);
-	*/
 
 
 //}
+
+	// Moving test
+	/*
+	LL_mDelay(4000);
+	LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_1); // Enable moving
+ // LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_1); // Restrict moving
+	LL_TIM_OC_SetCompareCH3(TIM2,0);            // Right moving
+	LL_TIM_OC_SetCompareCH2(TIM2,30);           // Right moving
+	LL_mDelay(600);
+	LL_TIM_OC_SetCompareCH2(TIM2,0);            // Left moving
+	LL_TIM_OC_SetCompareCH3(TIM2,30);           // Left moving
+	LL_mDelay(1000000);
+	*/
+
+	  LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);
+	  LL_mDelay(1000000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

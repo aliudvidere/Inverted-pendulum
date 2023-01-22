@@ -107,6 +107,10 @@ void MX_TIM4_Init(void)
   GPIO_InitStruct.Alternate = LL_GPIO_AF_2;
   LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* TIM4 interrupt Init */
+  NVIC_SetPriority(TIM4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(TIM4_IRQn);
+
   /* USER CODE BEGIN TIM4_Init 1 */
 
   /* USER CODE END TIM4_Init 1 */
@@ -125,10 +129,10 @@ void MX_TIM4_Init(void)
   TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
   LL_TIM_Init(TIM4, &TIM_InitStruct);
   LL_TIM_DisableARRPreload(TIM4);
-  LL_TIM_SetTriggerOutput(TIM4, LL_TIM_TRGO_RESET);
+  LL_TIM_SetTriggerOutput(TIM4, LL_TIM_TRGO_CC1IF);
   LL_TIM_DisableMasterSlaveMode(TIM4);
   /* USER CODE BEGIN TIM4_Init 2 */
-
+  TIM4->CNT = 32000; // Write this number to register to avoid negative numbers and overflow
   /* USER CODE END TIM4_Init 2 */
 
 }
@@ -182,7 +186,7 @@ void MX_TIM8_Init(void)
   LL_TIM_SetTriggerOutput(TIM8, LL_TIM_TRGO_RESET);
   LL_TIM_DisableMasterSlaveMode(TIM8);
   /* USER CODE BEGIN TIM8_Init 2 */
-
+  TIM8->CNT = 32000; // Write this number to register to avoid negative numbers and overflow
   /* USER CODE END TIM8_Init 2 */
 
 }

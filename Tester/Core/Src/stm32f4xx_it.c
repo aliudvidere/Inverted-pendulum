@@ -204,12 +204,13 @@ void SysTick_Handler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
-	flag_from_interapt = 1;
-	LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);
-	LL_TIM_OC_SetCompareCH3(TIM2,0);
-	LL_TIM_OC_SetCompareCH2(TIM2,0);
-	LL_GPIO_SetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
-	 //LL_TIM_DisableCounter(TIM2);
+    // Left end sensor
+	TIM8->CNT = 25818; // If 'zero' is center and equal 32000, the left border is 25818
+	LL_TIM_OC_SetCompareCH3(TIM2,0);  // Right moving
+	LL_TIM_OC_SetCompareCH2(TIM2,40); // Right moving
+	//end_sensor_signal();
+	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
+
 
   /* USER CODE END EXTI9_5_IRQn 0 */
   if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_9) != RESET)
@@ -225,17 +226,31 @@ void EXTI9_5_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles TIM4 global interrupt.
+  */
+void TIM4_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM4_IRQn 0 */
+
+  /* USER CODE END TIM4_IRQn 0 */
+  /* USER CODE BEGIN TIM4_IRQn 1 */
+
+  /* USER CODE END TIM4_IRQn 1 */
+}
+
+/**
   * @brief This function handles EXTI line[15:10] interrupts.
   */
 void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
-	flag_from_interapt = 1;
-	LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_2);
-	LL_TIM_OC_SetCompareCH3(TIM2,100);
-	LL_GPIO_SetOutputPin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin);
-	//LL_TIM_DisableCounter(TIM2);
+	LL_TIM_OC_SetCompareCH2(TIM2,0); // Stop
+	LL_TIM_OC_SetCompareCH3(TIM2,0); // Stop
+	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
+
+
+
 
   /* USER CODE END EXTI15_10_IRQn 0 */
   if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_15) != RESET)
