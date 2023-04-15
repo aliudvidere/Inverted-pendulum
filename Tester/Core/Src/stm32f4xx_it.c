@@ -205,11 +205,11 @@ void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
     // Left end sensor
-	TIM8->CNT = 25818; // If 'zero' is center and equal 32000, the left border is 25818
-	LL_TIM_OC_SetCompareCH3(TIM2,0);  // Right moving
-	LL_TIM_OC_SetCompareCH2(TIM2,40); // Right moving
-	//end_sensor_signal();
-	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
+//	TIM8->CNT = 25818; // If 'zero' is center and equal 32000, the left border is 25818
+//	LL_TIM_OC_SetCompareCH3(TIM2,0);  // Right moving
+//	LL_TIM_OC_SetCompareCH2(TIM2,40); // Right moving
+//	//end_sensor_signal();
+//	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
 
 
   /* USER CODE END EXTI9_5_IRQn 0 */
@@ -245,9 +245,9 @@ void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
-	LL_TIM_OC_SetCompareCH2(TIM2,0); // Stop
-	LL_TIM_OC_SetCompareCH3(TIM2,0); // Stop
-	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
+//	LL_TIM_OC_SetCompareCH2(TIM2,0); // Stop
+//	LL_TIM_OC_SetCompareCH3(TIM2,0); // Stop
+//	SCB->AIRCR = 0x5FA0004; // Software reset of MCU
 
 
 

@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -43,14 +44,62 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern char flag_from_interapt = 0;
 
-
+double l = 0.591;
+double m = 0.117;
+double M = 0.466;
+//double dt = 0.02;
+double g = 9.8;
+double coef[] ={36.899038, 35.906461, 173.199145, 63.277879};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+void moving_of_carriage(int32_t speed)
+{
+/***********************************************************************************
+   Function for speed control of DC motor
+   moving_of_carriage(0); // Stop moving
+   moving_of_carriage(-number); // Right moving
+   moving_of_carriage(+number); // Left moving
+
+   Center is 32000 at TIM8 after calibration
+   Left corner is Left edge position = 38000 tics at TIM8
+   Right corner is Right edge position = 26000 tics at TIM8
+***********************************************************************************/
+
+  LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_1); // Enable moving
+
+  if (speed == 0)
+  {
+      LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1); // Stop moving
+      LL_TIM_OC_SetCompareCH3(TIM2, 0);             // Stop moving
+      LL_TIM_OC_SetCompareCH2(TIM2, 0);             // Stop moving
+  }
+  else if (speed < 0)
+  {
+    if (speed < -500)
+      speed = -500;
+//    else if (speed > -70)
+//    		speed = -70;
+
+    LL_TIM_OC_SetCompareCH3(TIM2, 0);            // Right moving
+    LL_TIM_OC_SetCompareCH2(TIM2, (-((int32_t)speed)) + 17);       // Right moving
+
+  }
+  else if (speed > 0)
+  {
+    if (speed > 500)
+    		speed = 500;
+//    else if (speed < 70)
+//            speed = 70;
+
+    LL_TIM_OC_SetCompareCH2(TIM2, 0);            // Left moving
+    LL_TIM_OC_SetCompareCH3(TIM2, (uint32_t)(speed + 50));        // Left moving
+  }
+
+}
 void Buzzer_Start(void)
 {
 	LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_9);
@@ -118,6 +167,61 @@ void calibration(void)
 	  LL_TIM_OC_SetCompareCH2(TIM2,0);            // Left moving
 	  LL_TIM_OC_SetCompareCH3(TIM2,40);           // Left moving
 }
+void getPosition(uint16_t* car, uint16_t* pend){
+	*car = TIM8->CNT; // carridge
+	*pend = TIM4->CNT; // pendulume
+}
+
+int32_t getCarriageSpeed(){
+	TIM5->CNT = 0;
+	uint16_t zeroPos = TIM8->CNT;
+	while (zeroPos == TIM8->CNT);
+	return TIM5->CNT * (TIM8->CNT - zeroPos);
+}
+
+int32_t getPendulumSpeed(){
+	TIM5->CNT = 0;
+	uint16_t zeroPos = TIM4->CNT;
+	while (zeroPos == TIM4->CNT);
+	return (1000000 / TIM5->CNT * (TIM4->CNT - zeroPos));
+}
+
+//double LQRControl(){
+//	int32_t x = TIM8->CNT - 32000;
+//	int32_t alp = TIM4->CNT - 32000;
+//	LL_mDelay(20);
+//	int32_t x_new = TIM8->CNT - 32000;
+//	int32_t alp_new = TIM4->CNT - 32000;
+//	double force = 0;
+//	force = (x_new * coef[0] + (x_new - x) / dt * coef[1]) / 13000.0;
+//	force += (((alp_new * coef[2] + (alp_new - alp) * coef[3]) / 1000.0) * 2) * 3.14;
+//	double ac = 0;
+//	ac = force / (M + m);
+//	double speed = 0;
+//	speed = (((x_new - x) / dt) /13000.0 + (ac * dt)) * 13000.0;
+//	return speed;
+//}
+
+void mesureCarriageSpeed(){
+	uint8_t flag;
+			   // отослать данное назад
+
+		  while ((UART5->SR & USART_SR_RXNE) == 0) {} // Ждем пустого регистра
+				 flag = UART5->DR;
+
+		  int32_t data = getCarriageSpeed(); // 0
+
+		  while ((UART5->SR & USART_SR_TXE) == 0) {} // Ждем пустого регистра
+				  UART5->DR = flag;
+		  while ((UART5->SR & USART_SR_TXE) == 0) {} // Ждем пустого регистра
+				UART5->DR = data & 0xFF;
+		  while ((UART5->SR & USART_SR_TXE) == 0) {} // Ждем пустого регистра
+				UART5->DR = (data>>8) & 0xFF;
+		  while ((UART5->SR & USART_SR_TXE) == 0) {} // Ждем пустого регистра
+				UART5->DR = (data>>16) & 0xFF;
+		  while ((UART5->SR & USART_SR_TXE) == 0) {} // Ждем пустого регистра
+				UART5->DR = (data>>24) & 0xFF;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -132,14 +236,6 @@ void calibration(void)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
-	int setpoint = 0;
-	int PID_p = 0;
-	long enc_pendulum = 0;
-	long enc_carriage = 0;
-	long right_carriage_border = 0;
-	long left_carriage_border = 0;
-	long center_carriage_border = 0;
 
   /* USER CODE END 1 */
 
@@ -168,14 +264,19 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
+  MX_UART5_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-  Buzzer_Start();
+//  Buzzer_Start();
+
   TIM4->CR1 |= (1<<0); // Start timer 4 to read encoder
   TIM8->CR1 |= (1<<0); // Start timer 8 to read encoder
+  TIM5->CR1 |= (1<<0); // Start timer 3
+  UART5->CR1 |= USART_CR1_TE | USART_CR1_RE ; // разрешаем приемник и передатчик
+  LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
+  LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH3);
+  LL_TIM_EnableCounter(TIM2);
 
-    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
-    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH3);
-    LL_TIM_EnableCounter(TIM2);
   //LL_mDelay(1);
  // LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);// Stop moving
  // LL_mDelay(1);
@@ -209,19 +310,109 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  Buzzer_Start();
+//  TIM5->CNT = 0;
+//  TIM8->CNT = 0;
+//  moving_of_carriage(500);
+//  LL_mDelay(100);
+//  moving_of_carriage(0);
+//  uint32_t t = TIM5->CNT;
+//  uint32_t e = TIM8->CNT;
+
+  while(abs(TIM4->CNT - 32000) != 500);
+  TIM4->CNT = 32000;
+
+//  uint32_t x = 0;
+//  uint32_t last_x = 0;
+//  uint32_t last_alp = 0;
+//  uint32_t lastTimeMicros = 0;
+
+  double PIDp_pend = 30;
+  double PIDd_pend = 45;
+  double PIDi_pend = 1.6;
+
+//  double PIDp_car = 1;
+//  double PIDd_car = 0;
+//
+  double speed = 0;
+  uint32_t neededPos = 32000;
+  double err = 0;
+  double last_err = 0;
+  int32_t last_speed = 0;
+  int32_t sum_err = 0;
+  double mean_speed[] = {0, 0, 0, 0, 0};
+  double mean = 0;
+//
+//  double b = -18096.64;
+//  double k = 766.94;
+//  moving_of_carriage(70);
+//  LL_mDelay(1000);
+//  moving_of_carriage(0);
   while (1)
   {
 // Encoders information:
 // enc_carriage from edge to edge have 1365 ticks
 // enc_pendulum have 1000 ticks for 1 full circle rotation
+//	  	long now = TIM5->CNT;
+//	  	double dt = 1.0 * (now - lastTimeMicros) / 2000000;
+//		double x = (TIM8->CNT - 32000) * 1.0 * (3.14 * 0.012) / 1000;
+//		double alp = (TIM4->CNT - 32000) * 1.0 * 2 * 3.14 / 1000;
+//		double v = (x - last_x) / dt;
+//		double w = (alp - last_alp) /dt;
+//		double force = (x * coef[0] + v * coef[1] + alp * coef[2] + w * coef[3]);
+//		double ac = force / (M + m);
+//		double speed = (v + ac * dt) * 1000 / (3.14 * 0.012);
+//		if (speed < 0)
+//			speed = (speed - 179) / 57;
+//		else
+//			speed = (speed + 179) / 57;
+//		moving_of_carriage(speed);
+//
+//		last_x = x;
+//		last_alp = alp;
+//		lastTimeMicros = now;
+//		LL_mDelay(20);
+//	  while(abs(TIM4->CNT - 32000) > 6 && abs(TIM8->CNT - 32000) < 3000){
+		  while(abs(TIM4->CNT - 32000) != 500 && abs(TIM8->CNT - 32000) < 4500){
+			  err = (double)(neededPos) - (double)(TIM4->CNT);
+			  sum_err += err;
+			  speed = PIDp_pend * err + PIDd_pend * (err - last_err) + PIDi_pend * sum_err;
+			  mean_speed[0] = mean_speed[1];
+			  mean_speed[1] = mean_speed[2];
+			  mean_speed[2] = mean_speed[3];
+			  mean_speed[3] = mean_speed[4];
+			  mean_speed[4] = speed;
+
+
+			  mean = (mean_speed[0] + mean_speed[1] + mean_speed[2] + mean_speed[3] + mean_speed[4]) / 5;
+			  speed = rint(mean);
+			  moving_of_carriage((int32_t)(speed));
+			  last_err = err;
+			  LL_mDelay(9);
+		  }
+		  moving_of_carriage(0);
+
+//		  LL_mDelay(10);
+//	  }
+//	  LL_mDelay(10);
+//	  while(abs(TIM8->CNT - 32000) > 10000 && abs(TIM4->CNT - 32000) < 8){
+//		  last_err = err;
+//		  err = neededPos - TIM8->CNT;
+//		  int32_t speed = err * PIDp_car + (err - last_err) * PIDd_car;
+//		  if (abs(speed) > 100)
+//			  GPIOD->ODR |= (1<<15);
+//		  else
+//			  GPIOD->ODR &= ~(1<<15);
+//		  moving_of_carriage(speed);
+//	  }
+
 
 
 
 //if (flag_from_interapt == 0)
 //{
-//	enc_pendulum = LL_TIM_GetCounter(TIM4); // Information about position of pendulum
-	//enc_carriage = LL_TIM_GetCounter(TIM8); // Information about position of carriage
-	//int x = 0;
+//	getPosition(&enc_carriage, &enc_pendulum);
+
 
 
 
@@ -268,8 +459,8 @@ int main(void)
 	LL_mDelay(1000000);
 	*/
 
-	  LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);
-	  LL_mDelay(1000000);
+//	  LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_1);
+//	  LL_mDelay(1000000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

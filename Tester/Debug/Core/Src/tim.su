@@ -18,4 +18,5 @@
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_tim.h:2803:22:LL_TIM_DisableMasterSlaveMode	16	static
 ../Core/Src/tim.c:28:6:MX_TIM2_Init	88	static
 ../Core/Src/tim.c:83:6:MX_TIM4_Init	56	static
-../Core/Src/tim.c:140:6:MX_TIM8_Init	56	static
+../Core/Src/tim.c:140:6:MX_TIM5_Init	32	static
+../Core/Src/tim.c:170:6:MX_TIM8_Init	56	static
